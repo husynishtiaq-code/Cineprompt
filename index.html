@@ -1,0 +1,465 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CinePrompt Extractor — video to AI prompt</title>
+<style>
+:root{
+  --bg:#0b0d12; --card:#141926; --card2:#1a2133; --line:#28304a;
+  --txt:#e9edf6; --mut:#98a1b8; --acc:#e0a458; --acc2:#7cc7e0;
+  --warn:#f6b73c; --err:#f26d6d; --ok:#51d88a;
+}
+*{box-sizing:border-box}
+body{margin:0;background:radial-gradient(1200px 600px at 15% -10%,#232a1a 0%,var(--bg) 55%) fixed,var(--bg);color:var(--txt);font:15px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.topbar{display:flex;align-items:center;gap:14px;padding:15px 26px;border-bottom:1px solid var(--line);position:sticky;top:0;background:rgba(11,13,18,.92);backdrop-filter:blur(8px);z-index:10}
+.brand{font-weight:800;font-size:19px}.topbar .sub{color:var(--mut);font-size:13px;flex:1}
+.badge{font-size:12px;padding:5px 12px;border-radius:20px;border:1px solid var(--line);color:var(--mut)}
+.badge.ok{color:var(--ok);border-color:var(--ok)} .badge.warn{color:var(--warn);border-color:var(--warn)}
+main{max-width:1060px;margin:0 auto;padding:24px 18px 70px}
+.card{background:linear-gradient(180deg,var(--card),var(--card2));border:1px solid var(--line);border-radius:16px;padding:22px;margin-bottom:18px}
+h2{margin:0 0 14px;font-size:17px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.step{display:inline-flex;width:26px;height:26px;border-radius:50%;background:var(--acc);color:#111;font-size:13px;font-weight:800;align-items:center;justify-content:center}
+.pill{font-size:11px;font-weight:700;background:#2a2416;color:var(--acc);border:1px solid var(--acc);border-radius:20px;padding:3px 10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:680px){.grid2{grid-template-columns:1fr}}
+.uplabel{display:block;font-size:13px;font-weight:600;margin-bottom:8px}
+.uplabel em{color:var(--mut);font-style:normal;font-weight:400}
+.drop{border:2px dashed var(--line);border-radius:12px;min-height:190px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.2s;background:#0e1220}
+.drop:hover,.drop.over{border-color:var(--acc)}
+.drop-hint{text-align:center;color:var(--mut);font-size:14px;padding:20px}
+.drop-hint span{font-size:12px}
+.linkbtn{background:none;border:none;color:var(--acc2);cursor:pointer;font-size:14px;text-decoration:underline;padding:0}
+#preview{width:100%;max-height:280px;border-radius:10px;background:#000}
+.meta{color:var(--mut);font-size:12.5px;margin-top:8px}
+.settings-grid{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:680px){.settings-grid{grid-template-columns:1fr}}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.segbtn{padding:9px 14px;border-radius:9px;border:1px solid var(--line);background:#0e1220;color:var(--mut);cursor:pointer;font-weight:600}
+.segbtn.active{background:var(--acc);border-color:var(--acc);color:#111}
+.desc{color:var(--mut);font-size:12.5px;margin:8px 0 0}
+.btn{border:none;border-radius:10px;padding:12px 26px;font-size:15px;font-weight:700;cursor:pointer}
+.btn.primary{background:linear-gradient(135deg,var(--acc),#c97f2e);color:#111}
+.btn.secondary{background:#232a3d;color:var(--txt);border:1px solid var(--line)}
+.btn.ghost{background:transparent;color:var(--mut);border:1px solid var(--line)}
+.btn.sm{padding:7px 14px;font-size:13px}
+.btn:disabled{opacity:.4;cursor:not-allowed}
+.jobrow{display:flex;justify-content:space-between;font-size:14px;margin-bottom:8px}
+.progress{height:10px;background:#0e1220;border-radius:6px;overflow:hidden;border:1px solid var(--line)}
+.progress div{height:100%;width:0;background:linear-gradient(90deg,var(--acc),var(--acc2));transition:width .5s}
+.errorbox{margin-top:12px;border:1px solid var(--err);background:rgba(242,109,109,.08);border-radius:10px;padding:12px;font-size:14px}
+.warnbox{margin-top:12px;border-left:3px solid var(--warn);background:rgba(246,183,60,.08);padding:9px 12px;border-radius:0 8px 8px 0;font-size:13px}
+.timeline{display:flex;gap:4px;align-items:flex-end;min-height:86px}
+.tseg{flex:1;min-width:26px;background:#232a3d;border:1px solid var(--line);border-radius:6px;cursor:pointer;position:relative;transition:.15s;overflow:hidden}
+.tseg:hover{border-color:var(--acc)}
+.tseg.sel{border-color:var(--acc2);box-shadow:0 0 0 2px rgba(124,199,224,.35)}
+.tseg .tlabel{position:absolute;bottom:2px;left:0;right:0;text-align:center;font-size:10px;color:var(--mut)}
+.tseg .tbar{position:absolute;top:0;left:0;right:0;background:linear-gradient(180deg,var(--acc),transparent);opacity:.5}
+.mergebar{display:flex;gap:10px;align-items:center;margin-top:12px;flex-wrap:wrap}
+.shot{border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:14px;background:#0e1220}
+.shot.sel{border-color:var(--acc)}
+.shothead{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px}
+.shothead strong{font-size:15px}
+.frames{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0}
+.frames img{width:150px;border-radius:8px;border:1px solid var(--line);cursor:zoom-in}
+.kv{display:grid;grid-template-columns:150px 1fr;gap:4px 10px;font-size:13px;margin:8px 0}
+.kv dt{color:var(--mut)} .kv dd{margin:0}
+textarea.prompt{width:100%;min-height:220px;background:#0a0d15;border:1px solid var(--line);border-radius:10px;color:var(--txt);padding:12px;font:13px/1.6 ui-monospace,Menlo,Consolas,monospace;white-space:pre-wrap}
+.shotacts{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.conf{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.confchip{font-size:11px;border:1px solid var(--line);border-radius:12px;padding:2px 9px;color:var(--mut)}
+.confchip.low{color:var(--warn);border-color:var(--warn)}
+.outhead{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:14px}
+.exports{display:flex;gap:8px}
+.charrow{font-size:13px;padding:8px 0;border-bottom:1px solid var(--line)}
+.charrow:last-child{border:none}
+footer{text-align:center;color:var(--mut);font-size:12px;padding:20px}
+@media print{
+  .topbar,#uploadCard,#optCard,#progCard,.exports,.shotacts,footer,.mergebar{display:none!important}
+  body{background:#fff;color:#000}
+  .card{background:#fff;border:1px solid #ccc;color:#000}
+  textarea.prompt{border:1px solid #999;color:#000}
+}
+
+</style>
+</head>
+<body>
+<header class="topbar">
+  <div class="brand"><span class="logo">🎬</span> CinePrompt Extractor</div>
+  <div class="sub">Reference video → shot-by-shot AI video prompts</div>
+  <div id="healthBadge" class="badge">checking…</div>
+</header>
+
+<main>
+  <section class="card" id="uploadCard">
+    <h2><span class="step">1</span> Upload reference video</h2>
+    <div class="grid2">
+      <div id="drop" class="drop">
+        <input type="file" id="fileInput" accept="video/mp4,video/quicktime,.mov,.mp4,.m4v,.webm" hidden />
+        <div class="drop-hint" id="dropHint">Drop MP4 / MOV here or <button type="button" class="linkbtn" id="browseBtn">browse</button><br/><span>max 15 min · processed locally, never simulated</span></div>
+      </div>
+      <div>
+        <video id="preview" controls playsinline hidden></video>
+        <div id="metaBox" class="meta"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card" id="optCard" hidden>
+    <h2><span class="step">2</span> Analysis options</h2>
+    <div class="settings-grid">
+      <div>
+        <label class="uplabel">Analysis mode</label>
+        <div class="seg" id="modeSeg">
+          <button class="segbtn" data-value="quick">Quick</button>
+          <button class="segbtn active" data-value="standard">Standard</button>
+          <button class="segbtn" data-value="deep">Deep Cinematic</button>
+        </div>
+        <p class="desc">Quick: 1 frame/shot · Standard: 3 · Deep: 5 + denser sampling. Deep costs more vision tokens.</p>
+      </div>
+      <div>
+        <label class="uplabel">Output language</label>
+        <div class="seg" id="langSeg">
+          <button class="segbtn active" data-value="en">English</button>
+          <button class="segbtn" data-value="ur">اردو</button>
+          <button class="segbtn" data-value="roman">Roman Urdu</button>
+        </div>
+      </div>
+      <div>
+        <label class="uplabel">Prompt format</label>
+        <div class="seg wrap" id="targetSeg">
+          <button class="segbtn active" data-value="universal">Universal</button>
+          <button class="segbtn" data-value="flow">Google Flow</button>
+          <button class="segbtn" data-value="veo">Veo</button>
+          <button class="segbtn" data-value="kling">Kling</button>
+          <button class="segbtn" data-value="seedance">Seedance</button>
+          <button class="segbtn" data-value="hailuo">Hailuo</button>
+        </div>
+      </div>
+      <div>
+        <label class="uplabel">Scene segmentation</label>
+        <div class="seg" id="segModeSeg">
+          <button class="segbtn active" data-value="0">Auto (shot detect)</button>
+          <button class="segbtn" data-value="5">Every 5s</button>
+          <button class="segbtn" data-value="10">Every 10s</button>
+        </div>
+        <p class="desc">Auto uses real cut detection. You can merge/split scenes after analysis.</p>
+      </div>
+    </div>
+    <div id="visionWarn"></div>
+    <button id="analyzeBtn" class="btn primary" style="margin-top:14px">Analyze video</button>
+  </section>
+
+  <section class="card" id="progCard" hidden>
+    <h2><span class="step">3</span> Analysis progress</h2>
+    <div class="jobrow"><span id="stageLabel">Starting…</span><span id="progPct">0%</span></div>
+    <div class="progress"><div id="progFill"></div></div>
+    <div id="jobError" class="errorbox" hidden></div>
+  </section>
+
+  <section id="results" hidden>
+    <div class="card">
+      <h2><span class="step">4</span> Scene timeline <span class="pill" id="sceneCount"></span></h2>
+      <div id="timeline" class="timeline"></div>
+      <div class="mergebar">
+        <button id="mergeBtn" class="btn ghost sm" disabled>Merge selected</button>
+        <button id="splitBtn" class="btn ghost sm" disabled>Split selected at midpoint</button>
+        <span class="meta">Click scenes to select · shift-click for ranges</span>
+      </div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <h2>Camera movement summary</h2>
+        <div id="camSummary"></div>
+      </div>
+      <div class="card">
+        <h2>Character consistency</h2>
+        <div id="charPanel"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Audio</h2>
+      <div id="audioBox" class="meta"></div>
+    </div>
+
+    <div class="card">
+      <div class="outhead">
+        <h2 style="margin:0">Shot-by-shot prompts</h2>
+        <div class="exports">
+          <button class="btn secondary sm" id="expTxt">Export TXT</button>
+          <button class="btn secondary sm" id="expJson">Export JSON</button>
+          <button class="btn secondary sm" id="expPrint">Print / PDF</button>
+        </div>
+      </div>
+      <div id="shots"></div>
+    </div>
+  </section>
+</main>
+
+<footer>CinePrompt Extractor · evidence-based extraction — uncertain details are flagged, never invented</footer>
+<script>
+/* CinePrompt Extractor — frontend */
+"use strict";
+const $ = (id) => document.getElementById(id);
+const state = { uploadId: null, meta: null, jobId: null, result: null, selected: new Set(), opts: { mode: "standard", language: "en", target: "universal", segInterval: 0 } };
+
+fetch("/api/health").then(r => r.json()).then(h => {
+  const b = $("healthBadge");
+  state.vision = h;
+  if (h.visionConfigured) { b.textContent = "vision: " + h.visionProvider; b.classList.add("ok"); }
+  else { b.textContent = "vision: not configured"; b.classList.add("warn"); }
+}).catch(() => { $("healthBadge").textContent = "server offline"; });
+
+// ---------- upload ----------
+const drop = $("drop"), fileInput = $("fileInput");
+$("browseBtn").addEventListener("click", (e) => { e.stopPropagation(); fileInput.click(); });
+drop.addEventListener("click", () => fileInput.click());
+drop.addEventListener("dragover", (e) => { e.preventDefault(); drop.classList.add("over"); });
+drop.addEventListener("dragleave", () => drop.classList.remove("over"));
+drop.addEventListener("drop", (e) => { e.preventDefault(); drop.classList.remove("over"); if (e.dataTransfer.files[0]) doUpload(e.dataTransfer.files[0]); });
+fileInput.addEventListener("change", () => { if (fileInput.files[0]) doUpload(fileInput.files[0]); });
+
+async function doUpload(file) {
+  $("dropHint").innerHTML = "Uploading…";
+  const fd = new FormData(); fd.append("video", file);
+  try {
+    const res = await fetch("/api/upload", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Upload failed");
+    state.uploadId = data.uploadId; state.meta = data.meta;
+    const v = $("preview"); v.src = data.videoUrl; v.hidden = false;
+    $("dropHint").innerHTML = `✓ ${data.fileName}<br/><span>click to replace</span>`;
+    const m = data.meta;
+    $("metaBox").innerHTML = `Duration <b>${m.duration}s</b> · ${m.width}×${m.height} · ${m.fps}fps · aspect ${m.aspect} · ${(m.sizeBytes / 1048576).toFixed(1)} MB`;
+    $("optCard").hidden = false;
+    checkVisionWarn();
+  } catch (e) {
+    $("dropHint").innerHTML = "⚠️ " + e.message + '<br/><span>try again</span>';
+  }
+}
+
+function checkVisionWarn() {
+  const box = $("visionWarn"); box.innerHTML = "";
+  if (state.vision && !state.vision.visionConfigured) {
+    const d = document.createElement("div");
+    d.className = "warnbox";
+    d.innerHTML = "⚠️ <b>No vision model configured</b> (VISION_PROVIDER=none). The app will still measure scene cuts, timestamps, durations and pixel-estimated camera motion — but visual descriptions (characters, lighting, actions) will be marked <b>[uncertain]</b>. Set VISION_PROVIDER=openai or gemini with an API key in <code>.env</code> for full cinematic analysis. Nothing will be simulated.";
+    box.appendChild(d);
+  }
+}
+
+// ---------- option selectors ----------
+function wireSeg(id, key, cast) {
+  $(id).querySelectorAll(".segbtn").forEach(b => b.addEventListener("click", () => {
+    $(id).querySelectorAll(".segbtn").forEach(x => x.classList.remove("active"));
+    b.classList.add("active");
+    state.opts[key] = cast ? cast(b.dataset.value) : b.dataset.value;
+  }));
+}
+wireSeg("modeSeg", "mode"); wireSeg("langSeg", "language"); wireSeg("targetSeg", "target");
+wireSeg("segModeSeg", "segInterval", Number);
+
+// ---------- analyze ----------
+$("analyzeBtn").addEventListener("click", async () => {
+  if (!state.uploadId) return;
+  $("progCard").hidden = false; $("results").hidden = true; $("jobError").hidden = true;
+  $("analyzeBtn").disabled = true;
+  try {
+    const res = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ uploadId: state.uploadId, ...state.opts }) });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Analysis failed to start");
+    state.jobId = data.jobId;
+    poll();
+  } catch (e) {
+    const eb = $("jobError"); eb.hidden = false; eb.textContent = "⚠️ " + e.message;
+    $("analyzeBtn").disabled = false;
+  }
+});
+
+async function poll() {
+  clearTimeout(state.pt);
+  try {
+    const res = await fetch(`/api/jobs/${state.jobId}`);
+    const j = await res.json();
+    $("stageLabel").textContent = j.stage || j.status;
+    $("progPct").textContent = (j.progress || 0) + "%";
+    $("progFill").style.width = (j.progress || 0) + "%";
+    if (j.status === "done") { $("analyzeBtn").disabled = false; renderResults(j.result); return; }
+    if (j.status === "failed") {
+      const eb = $("jobError"); eb.hidden = false; eb.textContent = "⚠️ " + (j.error || "Analysis failed");
+      $("analyzeBtn").disabled = false; return;
+    }
+  } catch { /* transient */ }
+  state.pt = setTimeout(poll, 3000);
+}
+
+// ---------- results ----------
+function fmtT(s) { return `${String(Math.floor(s / 60)).padStart(2, "0")}:${(s % 60).toFixed(1).padStart(4, "0")}`; }
+
+function renderResults(r) {
+  state.result = r;
+  state.selected = new Set();
+  $("results").hidden = false;
+  $("progCard").hidden = true;
+  $("sceneCount").textContent = r.scenes.length + " shots";
+  renderTimeline(r);
+  renderCamSummary(r);
+  renderChars(r);
+  renderAudio(r);
+  renderShots(r);
+  document.getElementById("results").scrollIntoView({ behavior: "smooth" });
+}
+
+function renderTimeline(r) {
+  const tl = $("timeline"); tl.innerHTML = "";
+  const total = r.meta.duration || 1;
+  r.scenes.forEach((s, i) => {
+    const d = document.createElement("div");
+    d.className = "tseg"; d.style.height = `${40 + (s.duration / total) * 120}px`;
+    d.innerHTML = `<div class="tbar"></div><div class="tlabel">${s.index}<br/>${s.duration}s</div>`;
+    d.title = `Shot ${s.index}: ${fmtT(s.start)}–${fmtT(s.end)}`;
+    d.onclick = (e) => {
+      if (e.shiftKey && state.selected.size) {
+        const arr = [...state.selected].sort((a, b) => a - b);
+        const from = Math.min(arr[0], i), to = Math.max(arr[arr.length - 1], i);
+        state.selected = new Set(); for (let k = from; k <= to; k++) state.selected.add(k);
+      } else if (state.selected.has(i)) state.selected.delete(i); else state.selected.add(i);
+      refreshSelection();
+    };
+    d.dataset.i = i;
+    tl.appendChild(d);
+  });
+  refreshSelection();
+}
+function refreshSelection() {
+  document.querySelectorAll(".tseg").forEach(d => d.classList.toggle("sel", state.selected.has(+d.dataset.i)));
+  document.querySelectorAll(".shot").forEach(s => s.classList.toggle("sel", state.selected.has(+s.dataset.i)));
+  $("mergeBtn").disabled = state.selected.size < 2;
+  $("splitBtn").disabled = state.selected.size !== 1;
+}
+
+$("mergeBtn").addEventListener("click", async () => {
+  const idx = [...state.selected].sort((a, b) => a - b);
+  const segs = [];
+  let i = 0;
+  const inSel = new Set(idx);
+  while (i < state.result.scenes.length) {
+    if (inSel.has(i)) {
+      const start = state.result.scenes[i].start;
+      let j = i; while (j + 1 < state.result.scenes.length && inSel.has(j + 1)) j++;
+      segs.push({ start, end: state.result.scenes[j].end }); i = j + 1;
+    } else { const s = state.result.scenes[i]; segs.push({ start: s.start, end: s.end }); i++; }
+  }
+  await applySegments(segs);
+});
+$("splitBtn").addEventListener("click", async () => {
+  const i = [...state.selected][0];
+  const s = state.result.scenes[i];
+  const mid = +((s.start + s.end) / 2).toFixed(2);
+  const segs = state.result.scenes.map((x, k) => k === i ? [{ start: x.start, end: mid }, { start: mid, end: x.end }] : [{ start: x.start, end: x.end }]).flat();
+  await applySegments(segs);
+});
+async function applySegments(segs) {
+  $("stageLabel").textContent = "Rebuilding scenes…"; $("progCard").hidden = false; $("progFill").style.width = "40%";
+  try {
+    const res = await fetch(`/api/jobs/${state.jobId}/scenes`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ segments: segs }) });
+    const j = await res.json();
+    if (!res.ok) throw new Error(j.error || "Rebuild failed");
+    renderResults(j.result);
+  } catch (e) { alert("⚠️ " + e.message); }
+  $("progCard").hidden = true;
+}
+
+function renderCamSummary(r) {
+  const box = $("camSummary"); box.innerHTML = "";
+  if (!r.cameraSummary.length) { box.innerHTML = '<p class="meta">No camera data.</p>'; return; }
+  for (const c of r.cameraSummary) {
+    const d = document.createElement("div");
+    d.className = "charrow";
+    d.innerHTML = `<strong>${c.movement}</strong> — ${c.shots} shot${c.shots > 1 ? "s" : ""}`;
+    box.appendChild(d);
+  }
+  const note = document.createElement("p");
+  note.className = "meta";
+  note.textContent = "Estimated from pixel motion between frames; 'uncertain' means the camera path could not be separated from in-scene motion.";
+  box.appendChild(note);
+}
+
+function renderChars(r) {
+  const box = $("charPanel"); box.innerHTML = "";
+  if (!r.visionAvailable) { box.innerHTML = '<p class="meta">Character tracking needs a vision model — not configured.</p>'; return; }
+  if (!r.characters.length) { box.innerHTML = '<p class="meta">No distinct characters identified.</p>'; return; }
+  for (const c of r.characters) {
+    const d = document.createElement("div");
+    d.className = "charrow";
+    d.innerHTML = `<strong>${c.label}</strong> · shots ${c.scenes.join(", ")}<br/><span class="meta">${[c.hair, c.clothing, c.features].filter(Boolean).join(" · ") || "see shot details"}</span>`;
+    box.appendChild(d);
+  }
+}
+
+function renderAudio(r) {
+  const a = r.audio; const box = $("audioBox");
+  if (!a.hasAudio) { box.textContent = "No audio track — analysis covers visuals only."; return; }
+  if (a.transcribed && a.transcript?.length) {
+    box.innerHTML = "<strong>Transcript (whisper):</strong><br/>" + a.transcript.map(t => `[${fmtT(t.start)}] ${t.text}`).join("<br/>");
+  } else { box.textContent = "⚠️ " + a.note; }
+}
+
+function renderShots(r) {
+  const box = $("shots"); box.innerHTML = "";
+  r.scenes.forEach((s, i) => {
+    const p = r.prompts.find(x => x.scene === s.index);
+    const d = document.createElement("div");
+    d.className = "shot"; d.dataset.i = i;
+    const confChips = p ? Object.entries(p.confidenceScores).map(([k, v]) =>
+      `<span class="confchip ${v != null && v < 0.5 ? "low" : ""}">${k.replace(/_/g, " ")}: ${v == null ? "n/a" : Math.round(v * 100) + "%"}</span>`).join("") : "";
+    d.innerHTML = `
+      <div class="shothead">
+        <strong>Shot ${s.index} · ${fmtT(s.start)}–${fmtT(s.end)} · ${s.duration}s</strong>
+        <span class="meta">boundary confidence ${Math.round((s.boundaryConfidence ?? 0) * 100)}% · camera: ${s.camera?.movement || "n/a"}</span>
+      </div>
+      <div class="frames">${s.frames.map(f => `<img src="${f.url}" loading="lazy" alt="frame at ${f.time}s"/>`).join("")}</div>
+      <dl class="kv">
+        <dt>Camera analysis</dt><dd>${(p?.sections.camera || "").replace(/\n/g, "<br/>")}</dd>
+        <dt>Reference</dt><dd>${p?.sections.referenceAnalysis || ""}</dd>
+        <dt>Target note</dt><dd class="meta">${p?.notes || ""}</dd>
+      </dl>
+      <label class="uplabel">Generated prompt <em>(${p?.target || r.meta ? "" : ""}editable)</em></label>
+      <textarea class="prompt" id="prompt-${s.index}">${(p?.prompt || "").replace(/</g, "&lt;")}</textarea>
+      <div class="conf">${confChips}</div>
+      <div class="shotacts">
+        <button class="btn secondary sm" data-act="copy">Copy prompt</button>
+        <input type="text" id="corr-${s.index}" placeholder="Correction (optional)…" style="flex:1;min-width:160px;background:#0a0d15;border:1px solid var(--line);border-radius:8px;color:var(--txt);padding:8px"/>
+        <button class="btn ghost sm" data-act="regen">Regenerate shot</button>
+      </div>`;
+    box.appendChild(d);
+    d.querySelector('[data-act="copy"]').onclick = async (e) => {
+      const ta = $("prompt-" + s.index);
+      await navigator.clipboard.writeText(ta.value);
+      e.target.textContent = "Copied ✓"; setTimeout(() => e.target.textContent = "Copy prompt", 1500);
+    };
+    d.querySelector('[data-act="regen"]').onclick = async (e) => {
+      const corr = $("corr-" + s.index).value.trim();
+      e.target.disabled = true; e.target.textContent = "Regenerating…";
+      try {
+        const res = await fetch(`/api/jobs/${state.jobId}/regenerate`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sceneIndex: s.index, correction: corr }) });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Regenerate failed");
+        $("prompt-" + s.index).value = data.prompt.prompt;
+      } catch (err) { alert("⚠️ " + err.message); }
+      e.target.disabled = false; e.target.textContent = "Regenerate shot";
+    };
+  });
+  refreshSelection();
+}
+
+// ---------- export ----------
+$("expTxt").addEventListener("click", () => window.location = `/api/jobs/${state.jobId}/export?format=txt`);
+$("expJson").addEventListener("click", () => window.location = `/api/jobs/${state.jobId}/export?format=json`);
+$("expPrint").addEventListener("click", () => window.print());
+
+</script>
+</body>
+</html>

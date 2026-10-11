@@ -1,0 +1,19 @@
+{
+  "name": "cineprompt-extractor",
+  "version": "1.0.0",
+  "description": "CinePrompt Extractor \u2014 video-to-prompt extraction for AI video generation",
+  "main": "server-index.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server-index.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "multer": "^1.4.5-lts.1",
+    "dotenv": "^16.4.5",
+    "cors": "^2.8.5"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

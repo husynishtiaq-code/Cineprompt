@@ -1,0 +1,14 @@
+services:
+  - type: web
+    name: cineprompt
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    envVars:
+      - key: VISION_PROVIDER
+        value: none
+      - key: RETENTION_HOURS
+        value: 24
+      # Optional — for full cinematic analysis, add in the Render dashboard:
+      # OPENAI_API_KEY or GEMINI_API_KEY
